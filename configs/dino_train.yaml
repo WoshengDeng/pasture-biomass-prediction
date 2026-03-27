@@ -1,0 +1,100 @@
+# configs/dino_train.yaml
+# Configuration for DINOv3 ViT-Huge fine-tuning on pasture biomass prediction
+
+# =============================================================================
+# Paths (adjust according to your environment)
+# =============================================================================
+paths:
+  base_path: "."  # Project root directory (relative paths resolved from here)
+  train_csv: "${paths.base_path}/data/raw/train.csv"
+  train_image_dir: "${paths.base_path}/data/raw/train"
+  test_csv: "${paths.base_path}/data/raw/test.csv"
+  test_image_dir: "${paths.base_path}/data/raw/test"
+  processed_dir: "${paths.base_path}/data/processed"  # Intermediate data directory (for preprocessed files, if any)
+  model_dir: "${paths.base_path}/outputs/models"      # Directory to save model weights
+  output_dir: "${paths.base_path}/outputs"            # Directory for logs and summaries
+
+# =============================================================================
+# Data parameters
+# =============================================================================
+data:
+  img_size: 512          # Input resolution per half-image
+  batch_size: 6          # Batch size (small due to ViT-Huge memory)
+  num_workers: 0         # Kaggle/Windows often use 0
+  target_cols:           # Output targets (order matters)
+    - "Dry_Green_g"
+    - "Dry_Dead_g"
+    - "Dry_Clover_g"
+    - "GDM_g"
+    - "Dry_Total_g"
+
+# =============================================================================
+# Model architecture
+# =============================================================================
+model:
+  name: "vit_huge_plus_patch16_dinov3.lvd1689m"  # DINOv3 ViT-Huge
+  pretrained: true
+  # LocalMambaBlock settings (token mixing)
+  fusion_kernel_size: 5   # Kernel size for depthwise conv in fusion blocks
+  dropout: 0.2            # Dropout probability in the head and fusion blocks
+
+# =============================================================================
+# Training hyperparameters
+# =============================================================================
+training:
+  seed: 42
+  n_folds: 4
+  folds_to_train: [0, 1, 2, 3]  # Which folds to run (0‑based)
+  epochs: 210                    # Maximum epochs (early stopping will cut short)
+  warmup_epochs: 2               # Linear warmup epochs (converted to steps)
+  lr_backbone: 1e-5             # Learning rate for pretrained backbone
+  lr_head: 5e-4                  # Learning rate for task‑specific layers
+  weight_decay: 1e-2             # AdamW weight decay
+  clip_grad_norm: 1.0            # Gradient clipping threshold
+  early_stopping_patience: 15    # Stop if no improvement for this many epochs
+  loss_beta: 5.0                 # Beta parameter for Smooth L1 (Huber) loss
+
+# =============================================================================
+# Evaluation metrics
+# =============================================================================
+metrics:
+  weighted_r2_weights: [0.1, 0.1, 0.1, 0.2, 0.5]  # Per‑target weights for weighted R²
+
+# =============================================================================
+# Data augmentation transforms (optional, can be expanded)
+# =============================================================================
+augmentations:
+  train:
+    resize: ${data.img_size}
+    horizontal_flip_p: 0.5
+    vertical_flip_p: 0.5
+    random_rotate_90_p: 0.5
+    shift_scale_rotate:
+      shift_limit: 0.1
+      scale_limit: 0.1
+      rotate_limit: 15
+      p: 0.5
+    color_jitter:
+      brightness: 0.1
+      contrast: 0.1
+      saturation: 0.1
+      hue: 0.05
+      p: 0.3
+    normalize:
+      mean: [0.485, 0.456, 0.406]   # ImageNet mean
+      std: [0.229, 0.224, 0.225]    # ImageNet std
+  val:
+    resize: ${data.img_size}
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+# =============================================================================
+# Mixed precision
+# =============================================================================
+mixed_precision: true   # Enable AMP (torch.cuda.amp)
+
+# =============================================================================
+# Hardware
+# =============================================================================
+device: "cuda"          # Override with "cpu" if needed

@@ -1,0 +1,121 @@
+# configs/siglip_train.yaml
+# Configuration for training SigLIP-based GBDT models for biomass prediction.
+# This config follows the style of dino_train.yaml.
+
+# =============================================================================
+# Paths (adjust according to your environment)
+# =============================================================================
+paths:
+  base_path: "."  # Project root directory (relative paths resolved from here)
+
+  # Raw data directories
+  data_path: "${paths.base_path}/data/raw"
+  train_image_dir: "${paths.data_path}/train"   # Training images (for feature extraction)
+  test_image_dir: "${paths.data_path}/test"     # Test images (for inference)
+
+  # Split file containing image paths and fold assignments
+  split_path: "${paths.data_path}/data/processed/csiro_data_split.csv"
+
+  # Pretrained SigLIP model (local path or HuggingFace model identifier)
+  siglip_model_path: "${paths.base_path}/pretrained/google-siglip-so400m-patch14-384"  # Adjust as needed
+
+  # Output directory for trained GBDT models and other artifacts
+  output_dir: "${paths.base_path}/outputs/siglip_models"
+# =============================================================================
+# Data parameters
+# =============================================================================
+data:
+  # Image processing
+  patch_size: 520                                             # Size of square patches for image splitting
+  overlap: 16                                                 # Overlap between consecutive patches
+  embedding_dim: 1152                                         # Dimension of SigLIP image embeddings (for validation)
+
+  # Target definitions
+  targets:                                                     # All targets required
+    - "Dry_Green_g"
+    - "Dry_Dead_g"
+    - "Dry_Clover_g"
+    - "GDM_g"
+    - "Dry_Total_g"
+  target_names:                                                # Model output order
+    - "Dry_Clover_g"
+    - "Dry_Dead_g"
+    - "Dry_Green_g"
+    - "Dry_Total_g"
+    - "GDM_g"
+  target_max:                                                  # Maximum values for target normalization
+    Dry_Clover_g: 71.7865
+    Dry_Dead_g: 83.8407
+    Dry_Green_g: 157.9836
+    Dry_Total_g: 185.70
+    GDM_g: 157.9836
+  skip_targets:                                                # Targets not predicted by SigLIP (handled by DINO)
+    - "Dry_Clover_g"
+
+# =============================================================================
+# Feature engineering (SupervisedEmbeddingEngine)
+# =============================================================================
+feature_engineering:
+  pca_n_components: 0.80                                       # PCA variance retention (or integer number of components)
+  pls_n_components: 8                                          # Number of PLS components (supervised)
+  gmm_n_components: 6                                          # Number of Gaussian mixture components
+  use_semantic_features: true                                  # Include semantic features (greenness ratio, clover ratio, etc.)
+  random_state: 42                                             # Seed for PCA, PLS, GMM
+
+# GBDT models to train
+models:
+  # Each entry defines a model class and its hyperparameters.
+  # The 'class' string must match a known regressor in sklearn, lightgbm, or catboost.
+  gbdt:
+    - name: "hist_gradient_boosting"
+      class: "HistGradientBoostingRegressor"
+      params:
+        max_iter: 300
+        learning_rate: 0.05
+        max_depth: 5
+        random_state: 42
+
+    - name: "gradient_boosting"
+      class: "GradientBoostingRegressor"
+      params:
+        n_estimators: 1354
+        learning_rate: 0.01
+        max_depth: 3
+        random_state: 42
+
+    - name: "catboost"
+      class: "CatBoostRegressor"
+      params:
+        iterations: 1900
+        learning_rate: 0.045
+        depth: 4
+        verbose: 0
+        random_state: 42
+        allow_writing_files: false
+
+    - name: "lightgbm"
+      class: "LGBMRegressor"
+      params:
+        n_estimators: 807
+        learning_rate: 0.014
+        num_leaves: 48
+        verbose: -1
+        random_state: 42
+
+# =============================================================================
+# Training configuration
+# =============================================================================
+training:
+  seed: 42                                                     # Global random seed
+  n_folds: 4                                                   # Number of folds (must match the 'fold' column in split CSV)
+  fold_column: "fold"                                          # Column name in split CSV indicating fold index
+
+# Output options
+output:
+  save_models: true                                            # Whether to save each trained model (as joblib/pickle)
+
+# =============================================================================
+# Hardware
+# =============================================================================
+device: "cuda"                                                 # Device for feature extraction ('cuda' or 'cpu')
+mixed_precision: true                                          # Use mixed precision for feature extraction (optional)

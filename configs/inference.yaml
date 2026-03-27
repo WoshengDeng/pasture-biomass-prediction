@@ -1,0 +1,117 @@
+# configs/inference.yaml
+# Configuration for final inference (ensemble of DINO and SigLIP)
+
+# =============================================================================
+# Paths (adjust according to your environment)
+# =============================================================================
+paths:
+  base_path: "."  # Project root directory
+
+  # Raw data paths (original competition images and CSV)
+  raw_data_path: "${paths.base_path}/data/raw"
+  train_csv: "${paths.raw_data_path}/train.csv"
+  test_csv: "${paths.raw_data_path}/test.csv"
+
+  # Processed data paths (derived files like split CSV with embeddings)
+  processed_data_path: "${paths.base_path}/data/processed"
+  split_path: "${paths.processed_data_path}/csiro_data_split.csv"  # Includes folds & precomputed embeddings
+
+  # Model paths
+  models_dir: "${paths.base_path}/outputs/models"          # DINO fold models (fold*.pth)
+  siglip_model_path: "${paths.base_path}/pretrained/google-siglip-so400m-patch14-384"  # Local SigLIP model
+
+  # Output paths
+  output_dir: "${paths.base_path}/outputs"
+  submission_filename: "submission.csv"  # Saved under output_dir
+
+# =============================================================================
+# General settings
+# =============================================================================
+seed: 42
+device: "cuda"                                                               # "cuda" or "cpu"
+mixed_precision: true                                                        # Use AMP for DINO inference
+
+# =============================================================================
+# DINO model configuration
+# =============================================================================
+dino:
+  model_name: "vit_huge_plus_patch16_dinov3.lvd1689m"
+  img_size: 512
+  batch_size: 2
+  n_folds: 4
+  dropout: 0.2
+
+  # Post-processing heuristics (applied after inference)
+  postprocess:
+    clover_scale: 0.8                         # Scale factor for Clover predictions
+    dead_adjust:
+      threshold_high: 20.0
+      factor_high: 1.1
+      threshold_low: 10.0
+      factor_low: 0.9
+
+# =============================================================================
+# SigLIP configuration
+# =============================================================================
+siglip:
+  # Image processing
+  patch_size: 520
+  overlap: 16
+  embedding_dim: 1152
+
+  # Targets
+  target_names: ["Dry_Clover_g", "Dry_Dead_g", "Dry_Green_g", "Dry_Total_g", "GDM_g"]
+  target_max:
+    Dry_Clover_g: 71.7865
+    Dry_Dead_g: 83.8407
+    Dry_Green_g: 157.9836
+    Dry_Total_g: 185.70
+    GDM_g: 157.9836
+  skip_targets: ["Dry_Clover_g"]               # Clover is predicted by DINO only
+
+  # GBDT models to use for SigLIP predictions
+  # (These are the same models trained in siglip_train.yaml; they will be loaded from saved files)
+  gbdt_models:
+    - name: "hist_gradient_boosting"
+      class: "HistGradientBoostingRegressor"
+      params:
+        max_iter: 300
+        learning_rate: 0.05
+        max_depth: 5
+        random_state: 42
+    - name: "gradient_boosting"
+      class: "GradientBoostingRegressor"
+      params:
+        n_estimators: 1354
+        learning_rate: 0.01
+        max_depth: 3
+        random_state: 42
+    - name: "catboost"
+      class: "CatBoostRegressor"
+      params:
+        iterations: 1900
+        learning_rate: 0.045
+        depth: 4
+        verbose: 0
+        random_state: 42
+        allow_writing_files: false
+    - name: "lightgbm"
+      class: "LGBMRegressor"
+      params:
+        n_estimators: 807
+        learning_rate: 0.014
+        num_leaves: 48
+        verbose: -1
+        random_state: 42
+
+# =============================================================================
+# Ensemble configuration
+# =============================================================================
+ensemble:
+  weights:
+    dino: 0.70
+    siglip: 0.30
+  all_targets: ["Dry_Green_g", "Dry_Clover_g", "Dry_Dead_g", "GDM_g", "Dry_Total_g"]
+  clover_only_dino: true                     # Use DINO for Clover exclusively
+  enforce_physical_constraints: true         # Clip negative values and recompute derived targets
+  submission_order: ["Dry_Green_g", "Dry_Dead_g", "Dry_Clover_g", "GDM_g", "Dry_Total_g"]  # Order in submission (matches competition)

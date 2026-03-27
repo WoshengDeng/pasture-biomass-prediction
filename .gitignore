@@ -1,0 +1,62 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# macOS system files
+.DS_Store
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+
+# Logs and database
+*.log
+*.sqlite3
+
+# Output directories (model weights, submission, logs)
+outputs/
+!outputs/.gitkeep
+
+# Data directories (raw, processed, records) – keep only .gitkeep
+data/raw/*/
+data/raw/*.*
+!data/raw/.gitkeep
+!data/raw/README.md
+data/processed/*/
+data/processed/*.*
+!data/processed/.gitkeep
+data/records/*/
+data/records/*.*
+!data/records/.gitkeep
+
+# Pretrained models (large files)
+pretrained/*/
+pretrained/*.*
+!pretrained/.gitkeep
+!pretrained/README.md
+
+# Configuration files with secrets (if any)
+.env
+*.key
+*.pem
+
+# Temporary files
+*.tmp
+*.bak
