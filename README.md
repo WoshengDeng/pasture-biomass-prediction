@@ -31,7 +31,7 @@ The goal is to build a robust and scalable vision-based system that can generali
 
 The overall system follows a modular pipeline that covers data processing, model training, and inference with ensembling and post-processing:
 
-```mermaid
+```
 Raw Data (Images + Metadata)
         ↓
 Data Preprocessing (pivot to multi-target format, stratified group k-fold)
